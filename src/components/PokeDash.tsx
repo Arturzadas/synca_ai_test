@@ -71,24 +71,18 @@ export const PokeDash = () => {
       setConnectionStatus("✅ Ready, share your ID to connect");
     });
 
-    // Host receiving a new connection
     peer.on("connection", (conn) => {
       if (isHost) {
         connsRef.current[conn.peer] = conn;
         setConnectionStatus(`Peer ${conn.peer} connected`);
 
-        // Send current state to new peer
-        if (conn.open) {
-          conn.send({
-            type: "initial_state",
-            pokemons,
-            votes: votesRef.current,
-            chatMessages,
-          });
-        }
-
         conn.on("data", (msg) => handleIncomingData(msg, conn.peer));
         conn.on("close", () => delete connsRef.current[conn.peer]);
+
+        // Wait until connection is open, then send full state
+        conn.on("open", () => {
+          sendFullStateTo(conn); // <-- use your helper
+        });
       }
     });
 
@@ -97,10 +91,9 @@ export const PokeDash = () => {
     };
   }, [isHost]);
 
-  // Send full state to a specific connection (host only)
   const sendFullStateTo = (conn: Peer.DataConnection) => {
     conn.send({
-      type: "state",
+      type: "initial_state",
       pokemons: pokemonsRef.current,
       votes: votesRef.current,
       chatMessages: chatRef.current,
@@ -135,7 +128,6 @@ export const PokeDash = () => {
     setHasVoted(false);
 
     broadcast({ type: "regen", pokemons: [newPokemon1, newPokemon2] });
-    broadcast({ type: "chat", text: "System: Resetting Pokémon…" });
 
     setChatMessages((prev) => [
       ...prev,
