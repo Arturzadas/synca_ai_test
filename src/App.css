@@ -4,6 +4,7 @@ body {
   justify-content: center;
   align-items: center;
   background-color: #434343;
+  font-family: "Fira Sans", Tahoma, Geneva, Verdana, sans-serif !important;
 }
 
 .App {
