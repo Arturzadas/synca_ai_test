@@ -30,12 +30,11 @@ export const PokeDash = () => {
   const [isHost, setIsHost] = useState(false);
 
   const peerRef = useRef<Peer | null>(null);
-  // host: store connections to all peers
+  //@ts-ignore
   const connsRef = useRef<Record<string, Peer.DataConnection>>({});
-  // client: store connection to host
+  //@ts-ignore
   const hostConnRef = useRef<Peer.DataConnection | null>(null);
 
-  // refs to store the latest state for host broadcasting
   const pokemonsRef = useRef<Pokemon[]>([]);
   const votesRef = useRef<Votes>({});
   const chatRef = useRef<ChatMessage[]>([]);
@@ -50,7 +49,6 @@ export const PokeDash = () => {
     chatRef.current = chatMessages;
   }, [chatMessages]);
 
-  // Load initial Pokémon
   useEffect(() => {
     const loadPokemons = async () => {
       const bulba = await fetchPokemon("Bulbasaur");
@@ -61,7 +59,6 @@ export const PokeDash = () => {
     loadPokemons();
   }, []);
 
-  // Setup PeerJS
   useEffect(() => {
     const peer = new Peer();
     peerRef.current = peer;
@@ -79,9 +76,8 @@ export const PokeDash = () => {
         conn.on("data", (msg) => handleIncomingData(msg, conn.peer));
         conn.on("close", () => delete connsRef.current[conn.peer]);
 
-        // Wait until connection is open, then send full state
         conn.on("open", () => {
-          sendFullStateTo(conn); // <-- use your helper
+          sendFullStateTo(conn);
         });
       }
     });
@@ -91,6 +87,7 @@ export const PokeDash = () => {
     };
   }, [isHost]);
 
+  //@ts-ignore
   const sendFullStateTo = (conn: Peer.DataConnection) => {
     conn.send({
       type: "initial_state",
@@ -100,7 +97,6 @@ export const PokeDash = () => {
     });
   };
 
-  // Connect to a host (client mode)
   const connectToPeer = () => {
     if (!remoteId.trim() || !peerRef.current) return;
     const conn = peerRef.current.connect(remoteId);
@@ -115,7 +111,6 @@ export const PokeDash = () => {
     conn.on("close", () => setConnectionStatus("Disconnected from host"));
   };
 
-  // Host regenerates Pokémon and sends update
   const regenPokemon = async () => {
     const randomId1 = Math.floor(Math.random() * 1010) + 1;
     const randomId2 = Math.floor(Math.random() * 1010) + 1;
@@ -139,15 +134,13 @@ export const PokeDash = () => {
   const vote = (pokemon: string) => {
     if (hasVoted) return;
 
-    setHasVoted(true); // prevent double-click locally
+    setHasVoted(true);
 
     if (isHost) {
-      // HOST: update votes locally and broadcast to all peers
       setVotes((prev) => {
         const updated = { ...prev, [pokemon]: (prev[pokemon] || 0) + 1 };
         votesRef.current = updated;
 
-        // Broadcast updated votes to all peers
         Object.values(connsRef.current).forEach((conn) => {
           if (conn.open) conn.send({ type: "votes_update", votes: updated });
         });
@@ -155,20 +148,10 @@ export const PokeDash = () => {
         return updated;
       });
     } else {
-      // PEER: send vote to host only
       hostConnRef.current?.send({ type: "vote", pokemon });
     }
   };
 
-  const applyVote = (pokemon: string) => {
-    setVotes((prev) => {
-      const updated = { ...prev, [pokemon]: (prev[pokemon] || 0) + 1 };
-      votesRef.current = updated; // keep ref in sync
-      return updated;
-    });
-  };
-
-  // Send chat message
   const sendMessage = () => {
     if (!chatInput.trim()) return;
     const msg = chatInput.trim();
