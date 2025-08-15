@@ -14,6 +14,11 @@ type Votes = {
   [key: string]: number;
 };
 
+type ChatMessage = {
+  from: string;
+  message: string;
+};
+
 function App() {
   const [pokemons, setPokemons] = useState<Pokemon[]>([]);
   const [votes, setVotes] = useState<Votes>({ Bulbasaur: 0, Pikachu: 0 });
@@ -24,8 +29,11 @@ function App() {
   const [connectionStatus, setConnectionStatus] =
     useState<string>("Not connected");
 
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
+
   const peerRef = useRef<Peer | null>(null);
-  const connRef = useRef<Peer.DataConnection | null>(null);
+  const connRef = useRef<any>(null);
 
   // Fetch Pokémon data
   useEffect(() => {
@@ -116,7 +124,21 @@ function App() {
         updated[message.pokemon] += 1;
         return updated;
       });
+    } else if (message.type === "chat") {
+      setChatMessages((prev) => [
+        ...prev,
+        { from: "Peer", message: message.text },
+      ]);
     }
+  };
+
+  const sendMessage = () => {
+    if (!chatInput.trim() || !connRef.current || !connRef.current.open) return;
+
+    const message = chatInput.trim();
+    connRef.current.send({ type: "chat", text: message });
+    setChatMessages((prev) => [...prev, { from: "You", message }]);
+    setChatInput("");
   };
 
   const getWinner = () => {
@@ -130,24 +152,51 @@ function App() {
     <div className="App">
       <h1>Pokémon Battle Royale</h1>
 
-      <div className="pokemon-container">
-        {pokemons.map((p) => (
-          <div key={p.name} className="pokemon-card">
-            <h2 className="capitalize">{p.name}</h2>
-            <img src={p.sprite} alt={p.name} />
-            <p>Weight: {p.weight}</p>
-            <p>Height: {p.height}</p>
-            <p>Base XP: {p.base_experience}</p>
-            <button
-              className="vote-button"
-              disabled={hasVoted}
-              onClick={() => vote(p.name)}
-            >
-              Vote
-            </button>
-            <p className="vote-count">{votes[p.name as keyof Votes]} votes</p>
+      <div className="main-container">
+        <div className="pokemon-container">
+          {pokemons.map((p) => (
+            <div key={p.name} className="pokemon-card">
+              <h2 className="capitalize">{p.name}</h2>
+              <img src={p.sprite} alt={p.name} />
+              <p>Weight: {p.weight}</p>
+              <p>Height: {p.height}</p>
+              <p>Base XP: {p.base_experience}</p>
+              <button
+                className="vote-button"
+                disabled={hasVoted}
+                onClick={() => vote(p.name)}
+              >
+                Vote
+              </button>
+              <p className="vote-count">{votes[p.name as keyof Votes]} votes</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Chat panel */}
+        <div className="chat-panel">
+          <h3>Chat</h3>
+          <div className="chat-messages">
+            {chatMessages.map((msg, i) => (
+              <div
+                key={i}
+                className={`chat-message ${
+                  msg.from === "You" ? "you" : "peer"
+                }`}
+              >
+                <strong>{msg.from}:</strong> {msg.message}
+              </div>
+            ))}
           </div>
-        ))}
+          <input
+            type="text"
+            placeholder="Type a message..."
+            value={chatInput}
+            onChange={(e) => setChatInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+          />
+          <button onClick={sendMessage}>Send</button>
+        </div>
       </div>
 
       <h2 className="winner">Winner: {getWinner()}</h2>
