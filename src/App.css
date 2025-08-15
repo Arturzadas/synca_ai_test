@@ -1,9 +1,15 @@
 /* General app styles */
+body {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #434343;
+}
 
 .App {
   max-width: 1200px;
   margin: 0 auto;
-  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  font-family: "Fira Sans", Tahoma, Geneva, Verdana, sans-serif;
   padding: 2rem;
   text-align: center;
   color: #333;
@@ -11,6 +17,7 @@
 
 h1 {
   margin-bottom: 2rem;
+  color: white;
 }
 
 /* Main layout */
@@ -178,4 +185,276 @@ h1 {
   font-size: 1.4rem;
   font-weight: bold;
   color: #ff5722;
+}
+
+.chatInput {
+  background: #ccc;
+  color: black;
+}
+
+.winner-card {
+  background: linear-gradient(135deg, #ffd700, #ffc107); /* golden gradient */
+  border: 3px solid #ffa500;
+  border-radius: 16px;
+  box-shadow: 0 8px 20px rgba(255, 215, 0, 0.4), 0 0 10px rgba(255, 223, 0, 0.6);
+  padding: 20px;
+  text-align: center;
+  font-weight: bold;
+  font-size: 1.2rem;
+  color: #333; /* darker text for readability */
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.winner-card:hover {
+  transform: scale(1.05);
+  box-shadow: 0 12px 25px rgba(255, 215, 0, 0.6),
+    0 0 15px rgba(255, 223, 0, 0.8);
+}
+
+.pokemon-card {
+  background: #f8f8f8;
+  border-radius: 16px;
+  width: 220px;
+  padding: 16px;
+  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-family: "Arial", sans-serif;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.pokemon-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+.pokemon-card img {
+  width: 120px;
+  height: 120px;
+  object-fit: contain;
+  margin-bottom: 12px;
+  border-radius: 12px;
+  background: #fff;
+  padding: 8px;
+}
+
+.pokemon-card h2 {
+  font-size: 1.3rem;
+  margin: 8px 0;
+  text-transform: capitalize;
+  color: #333;
+  text-align: center;
+}
+
+.pokemon-stats {
+  width: 100%;
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 0.85rem;
+  color: #444;
+  background: #eaeaea;
+  border-radius: 8px;
+  padding: 6px 4px;
+}
+
+.stat span:first-child {
+  font-weight: bold;
+  margin-bottom: 4px;
+  font-size: 0.75rem;
+}
+
+.stat-bar {
+  width: 100%;
+  height: 6px;
+  background: #ddd;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.stat-fill {
+  height: 100%;
+  border-radius: 4px;
+  background-color: #4caf50;
+  transition: width 0.3s ease;
+}
+
+/* Vote section */
+.vote-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.vote-button {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 8px;
+  background-color: #4caf50;
+  color: #fff;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.2s ease;
+}
+
+.vote-button:disabled {
+  background-color: #a5d6a7;
+  cursor: not-allowed;
+}
+
+.vote-button:hover:not(:disabled) {
+  background-color: #45a049;
+}
+
+.vote-count {
+  margin-top: 6px;
+  font-size: 0.85rem;
+  color: #333;
+}
+
+/* Winner card highlight */
+.winner-card {
+  border: 3px solid #ffcc00;
+  box-shadow: 0 6px 20px rgba(255, 215, 0, 0.5);
+}
+
+.pokemon-card {
+  width: 250px;
+  background: #f9f9f9;
+  border-radius: 16px;
+  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  font-family: Arial, sans-serif;
+  position: relative;
+}
+
+.card-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.pokemon-image {
+  width: 100px;
+  height: 100px;
+  object-fit: contain;
+  border-radius: 12px;
+  background: #fff;
+  padding: 6px;
+  margin-bottom: 6px;
+}
+
+.pokemon-name {
+  font-size: 1.2rem;
+  font-weight: bold;
+  text-transform: capitalize;
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.pokemon-types {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.type-badge {
+  padding: 2px 6px;
+  border-radius: 8px;
+  font-size: 0.7rem;
+  color: #fff;
+  text-transform: capitalize;
+}
+
+/* Example colors */
+.type-fire {
+  background: #f08030;
+}
+.type-water {
+  background: #6890f0;
+}
+.type-grass {
+  background: #78c850;
+}
+.type-electric {
+  background: #f8d030;
+}
+
+.vote-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 10px 0;
+}
+
+.vote-button {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 8px;
+  background-color: #4caf50;
+  color: #fff;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.vote-button:disabled {
+  background-color: #a5d6a7;
+  cursor: not-allowed;
+}
+
+.vote-count {
+  margin-top: 4px;
+  font-size: 0.85rem;
+  color: #333;
+}
+
+.pokemon-info {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-around;
+  gap: 6px;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 0.75rem;
+}
+
+.stat-icon {
+  width: 20px;
+  height: 20px;
+  margin-bottom: 2px;
+}
+
+.abilities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: center;
+  margin-top: 6px;
+}
+
+.ability-badge {
+  background: #eee;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 0.7rem;
+}
+
+.winner-card {
+  border: 3px solid #ffcc00;
+  box-shadow: 0 6px 20px rgba(255, 215, 0, 0.5);
 }
