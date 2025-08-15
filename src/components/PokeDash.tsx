@@ -8,73 +8,122 @@ import {
   Text,
   Input,
   Button,
-  SimpleGrid,
 } from "@chakra-ui/react";
 import type { ChatMessage, Pokemon, Votes } from "../types/pokemon";
 import { PokeCard } from "./PokeCard";
-import { dashStyles as styles } from "./styles";
+import { globalStyles, dashStyles as styles } from "./styles";
 import { Chat } from "./Chat";
+import { fetchPokemon } from "./helpers/helper";
 
 export const PokeDash = () => {
   const [pokemons, setPokemons] = useState<Pokemon[]>([]);
-  const [votes, setVotes] = useState<Votes>({ Bulbasaur: 0, Pikachu: 0 });
+  const [votes, setVotes] = useState<Votes>({});
   const [hasVoted, setHasVoted] = useState(false);
 
-  const [peerId, setPeerId] = useState<string>("");
-  const [remoteId, setRemoteId] = useState<string>("");
-  const [connectionStatus, setConnectionStatus] =
-    useState<string>("Not connected");
+  const [peerId, setPeerId] = useState("");
+  const [remoteId, setRemoteId] = useState("");
+  const [connectionStatus, setConnectionStatus] = useState("Not connected");
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
 
-  const [isHost, setIsHost] = useState(true);
+  const [isHost, setIsHost] = useState(false);
 
   const peerRef = useRef<Peer | null>(null);
-  const connRef = useRef<any>(null);
+  // host: store connections to all peers
+  const connsRef = useRef<Record<string, Peer.DataConnection>>({});
+  // client: store connection to host
+  const hostConnRef = useRef<Peer.DataConnection | null>(null);
 
-  // Fetch Pokémon data
+  // refs to store the latest state for host broadcasting
+  const pokemonsRef = useRef<Pokemon[]>([]);
+  const votesRef = useRef<Votes>({});
+  const chatRef = useRef<ChatMessage[]>([]);
+
   useEffect(() => {
-    const fetchPokemon = async (id: number | string) => {
-      const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${id}`);
-      const data = await res.json();
-      return {
-        id: data.id,
-        name: data.name,
-        sprite: data.sprites.front_default,
-        weight: data.weight,
-        height: data.height,
-        base_experience: data.base_experience,
-        types: data.types?.map((t: any) => t.type.name) || [],
-        abilities: data.abilities?.map((a: any) => a.ability.name) || [],
-      };
-    };
+    pokemonsRef.current = pokemons;
+  }, [pokemons]);
+  useEffect(() => {
+    votesRef.current = votes;
+  }, [votes]);
+  useEffect(() => {
+    chatRef.current = chatMessages;
+  }, [chatMessages]);
 
+  // Load initial Pokémon
+  useEffect(() => {
     const loadPokemons = async () => {
       const bulba = await fetchPokemon("Bulbasaur");
       const pika = await fetchPokemon("Pikachu");
       setPokemons([bulba, pika]);
+      setVotes({ [bulba.name]: 0, [pika.name]: 0 });
     };
-
     loadPokemons();
   }, []);
 
-  const regenPokemon = async () => {
-    const fetchPokemon = async (id: number) => {
-      const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${id}`);
-      const data = await res.json();
-      return {
-        id: data.id,
-        name: data.name,
-        sprite: data.sprites.front_default,
-        weight: data.weight,
-        height: data.height,
-        base_experience: data.base_experience,
-        types: data.types?.map((t: any) => t.type.name) || [],
-        abilities: data.abilities?.map((a: any) => a.ability.name) || [],
-      };
-    };
+  // Setup PeerJS
+  useEffect(() => {
+    const peer = new Peer();
+    peerRef.current = peer;
 
+    peer.on("open", (id) => {
+      setPeerId(id);
+      setConnectionStatus("✅ Ready, share your ID to connect");
+    });
+
+    // Host receiving a new connection
+    peer.on("connection", (conn) => {
+      if (isHost) {
+        connsRef.current[conn.peer] = conn;
+        setConnectionStatus(`Peer ${conn.peer} connected`);
+
+        // Send current state to new peer
+        if (conn.open) {
+          conn.send({
+            type: "initial_state",
+            pokemons,
+            votes: votesRef.current,
+            chatMessages,
+          });
+        }
+
+        conn.on("data", (msg) => handleIncomingData(msg, conn.peer));
+        conn.on("close", () => delete connsRef.current[conn.peer]);
+      }
+    });
+
+    return () => {
+      peer.destroy();
+    };
+  }, [isHost]);
+
+  // Send full state to a specific connection (host only)
+  const sendFullStateTo = (conn: Peer.DataConnection) => {
+    conn.send({
+      type: "state",
+      pokemons: pokemonsRef.current,
+      votes: votesRef.current,
+      chatMessages: chatRef.current,
+    });
+  };
+
+  // Connect to a host (client mode)
+  const connectToPeer = () => {
+    if (!remoteId.trim() || !peerRef.current) return;
+    const conn = peerRef.current.connect(remoteId);
+    hostConnRef.current = conn;
+    setIsHost(false);
+
+    conn.on("open", () => {
+      setConnectionStatus("✅ Connected to host!");
+      conn.send({ type: "request_state" }); // ask host for snapshot
+    });
+    conn.on("data", (msg) => handleIncomingData(msg));
+    conn.on("close", () => setConnectionStatus("Disconnected from host"));
+  };
+
+  // Host regenerates Pokémon and sends update
+  const regenPokemon = async () => {
     const randomId1 = Math.floor(Math.random() * 1010) + 1;
     const randomId2 = Math.floor(Math.random() * 1010) + 1;
 
@@ -85,17 +134,8 @@ export const PokeDash = () => {
     setVotes({ [newPokemon1.name]: 0, [newPokemon2.name]: 0 });
     setHasVoted(false);
 
-    if (connRef.current && connRef.current.open) {
-      connRef.current.send({
-        type: "regen",
-        pokemons: [newPokemon1.id, newPokemon2.id],
-      });
-
-      connRef.current.send({
-        type: "chat",
-        text: "System: Resetting Pokémon…",
-      });
-    }
+    broadcast({ type: "regen", pokemons: [newPokemon1, newPokemon2] });
+    broadcast({ type: "chat", text: "System: Resetting Pokémon…" });
 
     setChatMessages((prev) => [
       ...prev,
@@ -103,118 +143,127 @@ export const PokeDash = () => {
     ]);
   };
 
-  useEffect(() => {
-    const peer = new Peer();
-
-    peer.on("open", (id) => {
-      setPeerId(id);
-      setConnectionStatus("✅ Ready, share your ID to connect");
-
-      if (!remoteId) {
-        setIsHost(true);
-      }
-    });
-
-    peer.on("connection", (conn) => {
-      connRef.current = conn;
-      setConnectionStatus("Peer connected!");
-      conn.on("data", handleIncomingData);
-      conn.on("close", () => setConnectionStatus("Peer disconnected"));
-      conn.on("error", (err) => {
-        console.error("Connection error:", err);
-        setConnectionStatus("❌ Connection error");
-      });
-
-      setIsHost(false);
-    });
-
-    peerRef.current = peer;
-
-    return () => {
-      peer.destroy();
-    };
-  }, []);
-
-  const connectToPeer = () => {
-    if (!remoteId.trim() || !peerRef.current) return;
-    const conn = peerRef.current.connect(remoteId);
-    connRef.current = conn;
-
-    conn.on("open", () => setConnectionStatus("✅ Connected to peer!"));
-    conn.on("data", handleIncomingData);
-    conn.on("close", () => setConnectionStatus("Peer disconnected"));
-    conn.on("error", (err) => {
-      console.error("Connection error:", err);
-      setConnectionStatus("❌ Connection error");
-    });
-  };
-
+  // Send a vote
   const vote = (pokemon: string) => {
     if (hasVoted) return;
 
-    setVotes((prev) => ({
-      ...prev,
-      [pokemon]: (prev[pokemon] || 0) + 1,
-    }));
+    setHasVoted(true); // prevent double-click locally
 
-    if (connRef.current && connRef.current.open) {
-      connRef.current.send({ type: "vote", pokemon });
-    }
-
-    setHasVoted(true);
-  };
-
-  const handleIncomingData = async (message: any) => {
-    if (message.type === "vote") {
+    if (isHost) {
+      // HOST: update votes locally and broadcast to all peers
       setVotes((prev) => {
-        const updated = { ...prev };
-        if (!updated[message.pokemon]) updated[message.pokemon] = 0;
-        updated[message.pokemon] += 1;
+        const updated = { ...prev, [pokemon]: (prev[pokemon] || 0) + 1 };
+        votesRef.current = updated;
+
+        // Broadcast updated votes to all peers
+        Object.values(connsRef.current).forEach((conn) => {
+          if (conn.open) conn.send({ type: "votes_update", votes: updated });
+        });
+
         return updated;
       });
-    } else if (message.type === "chat") {
-      setChatMessages((prev) => [
-        ...prev,
-        { from: "Peer", message: message.text },
-      ]);
-    } else if (message.type === "regen") {
-      const loadById = async (id: number) => {
-        const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${id}`);
-        const data = await res.json();
-        return {
-          id,
-          name: data.name,
-          sprite: data.sprites.front_default,
-          weight: data.weight,
-          height: data.height,
-          base_experience: data.base_experience,
-          types: data.types?.map((t: any) => t.type.name) || [],
-          abilities: data.abilities?.map((a: any) => a.ability.name) || [],
-        };
-      };
-
-      const [p1, p2] = await Promise.all(
-        message.pokemons.map((id: number) => loadById(id))
-      );
-
-      setPokemons([p1, p2]);
-      setVotes({ [p1.name]: 0, [p2.name]: 0 });
-      setHasVoted(false);
-
-      setChatMessages((prev) => [
-        ...prev,
-        { from: "System", message: "Resetting Pokémon…" },
-      ]);
+    } else {
+      // PEER: send vote to host only
+      hostConnRef.current?.send({ type: "vote", pokemon });
     }
   };
 
-  const sendMessage = () => {
-    if (!chatInput.trim() || !connRef.current || !connRef.current.open) return;
+  const applyVote = (pokemon: string) => {
+    setVotes((prev) => {
+      const updated = { ...prev, [pokemon]: (prev[pokemon] || 0) + 1 };
+      votesRef.current = updated; // keep ref in sync
+      return updated;
+    });
+  };
 
-    const message = chatInput.trim();
-    connRef.current.send({ type: "chat", text: message });
-    setChatMessages((prev) => [...prev, { from: "You", message }]);
+  // Send chat message
+  const sendMessage = () => {
+    if (!chatInput.trim()) return;
+    const msg = chatInput.trim();
+
+    if (isHost) {
+      broadcast({ type: "chat", text: msg });
+    } else {
+      hostConnRef.current?.send({ type: "chat", text: msg });
+    }
+
+    setChatMessages((prev) => [...prev, { from: "You", message: msg }]);
     setChatInput("");
+  };
+
+  // Handle incoming data (both host and clients)
+  const handleIncomingData = (message: any, fromPeer?: string) => {
+    switch (message.type) {
+      case "vote":
+        if (isHost) {
+          // HOST receives a vote from a peer
+          setVotes((prev) => {
+            const updated = {
+              ...prev,
+              [message.pokemon]: (prev[message.pokemon] || 0) + 1,
+            };
+            votesRef.current = updated;
+
+            // Broadcast updated votes to all peers, including the sender
+            Object.values(connsRef.current).forEach((conn) => {
+              if (conn.open)
+                conn.send({ type: "votes_update", votes: updated });
+            });
+
+            return updated;
+          });
+        }
+        break;
+
+      case "votes_update":
+        // PEERS receive authoritative votes from host
+        setVotes(message.votes);
+        break;
+
+      case "regen":
+        setPokemons(message.pokemons);
+        setVotes({
+          [message.pokemons[0].name]: 0,
+          [message.pokemons[1].name]: 0,
+        });
+        setHasVoted(false);
+        setChatMessages((prev) => [
+          ...prev,
+          { from: "System", message: "Resetting Pokémon…" },
+        ]);
+        break;
+
+      case "chat":
+        setChatMessages((prev) => [
+          ...prev,
+          { from: isHost ? "Peer" : "Host", message: message.text },
+        ]);
+        if (isHost) {
+          // rebroadcast chat to other peers
+          Object.values(connsRef.current).forEach((conn) => {
+            if (conn.open && conn.peer !== fromPeer)
+              conn.send({ type: "chat", text: message.text });
+          });
+        }
+        break;
+      case "initial_state":
+        // Update local state with authoritative host data
+        setPokemons(message.pokemons);
+        setVotes(message.votes);
+        setChatMessages(message.chatMessages);
+        setHasVoted(false); // reset local voting state
+        break;
+
+      default:
+        break;
+    }
+  };
+
+  // Host broadcast helper
+  const broadcast = (msg: any) => {
+    Object.values(connsRef.current).forEach((conn) => {
+      if (conn.open) conn.send(msg);
+    });
   };
 
   const getWinner = () => {
@@ -248,7 +297,7 @@ export const PokeDash = () => {
 
       <Heading size="md">Winner: {getWinner()}</Heading>
 
-      {!isHost && (
+      {isHost && (
         <Button colorScheme="red" onClick={regenPokemon}>
           Regenerate
         </Button>
@@ -260,21 +309,28 @@ export const PokeDash = () => {
         <VStack {...styles.hstackGap}>
           <Box {...styles.inputBox}>
             <Text>Your Peer ID:</Text>
-            <Input value={peerId} />
+            <Input {...globalStyles.input} value={peerId} readOnly />
           </Box>
 
           <Box>
-            <Text>Connect to Peer ID:</Text>
+            <Text>Connect to Host ID:</Text>
             <HStack>
               <Input
                 value={remoteId}
                 onChange={(e) => setRemoteId(e.target.value)}
+                {...globalStyles.input}
               />
               <Button onClick={connectToPeer} colorScheme="green">
                 Connect
               </Button>
             </HStack>
           </Box>
+
+          {!isHost && (
+            <Button colorScheme="blue" onClick={() => setIsHost(true)}>
+              Become Host
+            </Button>
+          )}
         </VStack>
       </Box>
     </VStack>

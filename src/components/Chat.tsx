@@ -8,7 +8,7 @@ import {
   Button,
 } from "@chakra-ui/react";
 import { chatStyles as styles, globalStyles } from "./styles";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 
 export const Chat = ({
   chatMessages,
@@ -18,15 +18,14 @@ export const Chat = ({
 }) => {
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
-  const sendMessageHandler = () => {
-    sendMessage();
+  useEffect(() => {
     setTimeout(() => {
       if (chatContainerRef.current) {
         chatContainerRef.current.scrollTop =
           chatContainerRef.current.scrollHeight;
       }
     }, 10);
-  };
+  }, [chatMessages]);
 
   return (
     <Box {...styles.chatBox}>
@@ -55,7 +54,7 @@ export const Chat = ({
           value={chatInput}
           onChange={(e) => setChatInput(e.target.value)}
           {...globalStyles.input}
-          onKeyDown={(e) => e.key === "Enter" && sendMessageHandler()}
+          onKeyDown={(e) => e.key === "Enter" && sendMessage()}
         />
         <Button onClick={sendMessage} colorScheme="blue">
           Send
