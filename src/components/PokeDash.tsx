@@ -17,6 +17,7 @@ import { Chat } from "./Chat";
 import { fetchPokemon } from "./helpers/helper";
 import "../App.css";
 import { Dialog } from "@chakra-ui/react";
+import { StatsDialog } from "./StatsDialog";
 
 export const PokeDash = () => {
   const [pokemons, setPokemons] = useState<Pokemon[]>([]);
@@ -155,25 +156,39 @@ export const PokeDash = () => {
     }
   };
 
+  const votersRef = useRef<Set<string>>(new Set());
+
   const updateVotes = (pokemon: string, voterId: string) => {
+    // 1️⃣ Update votes state
     setVotes((prevVotes) => {
       const updatedVotes = {
         ...prevVotes,
         [pokemon]: (prevVotes[pokemon] || 0) + 1,
       };
-      votesRef.current = updatedVotes;
+      votesRef.current = updatedVotes; // keep ref in sync
 
-      setVoters((prevVoters) => {
-        const newVoters = new Set(prevVoters);
-        newVoters.add(voterId);
+      // 2️⃣ Update voters ref
+      votersRef.current.add(voterId);
 
-        const totalPeers = Object.keys(connsRef.current).length + 1;
-        if (newVoters.size >= totalPeers) setShowStats(true);
+      const totalPeers = Object.keys(connsRef.current).length + 1; // host + clients
+      console.log(
+        "Voters:",
+        votersRef.current.size,
+        "Total peers:",
+        totalPeers
+      );
 
-        return newVoters;
-      });
+      // 3️⃣ If everyone voted, show stats and notify clients
+      if (votersRef.current.size >= totalPeers) {
+        setShowStats(true);
+        console.log("dialog opening");
+        broadcast({ type: "voting_closed" });
+      }
 
-      // Broadcast to all peers
+      // 4️⃣ Update voters state to trigger re-render
+      setVoters(new Set(votersRef.current));
+
+      // 5️⃣ Broadcast updated votes to all peers
       Object.values(connsRef.current).forEach((conn) => {
         if (conn.open) conn.send({ type: "votes_update", votes: updatedVotes });
       });
@@ -242,6 +257,7 @@ export const PokeDash = () => {
         break;
 
       case "voting_closed":
+        console.log("voting closed");
         setShowStats(true);
         break;
 
@@ -272,9 +288,14 @@ export const PokeDash = () => {
   const winnerName = getWinner();
   const winnerPokemon = pokemons.find((p) => p.name === winnerName);
 
+  const closeDialog = () => {
+    console.log("closing");
+    setShowStats(false);
+  };
+
   return (
     <VStack {...styles.container} className={"font"}>
-      {isConnected && (
+      {(isConnected || isHost) && (
         <>
           <Heading {...styles.mainHeading}>Pokémon Battle Royale</Heading>
           <HStack {...styles.mainGrid}>
@@ -337,6 +358,14 @@ export const PokeDash = () => {
           )}
         </VStack>
       </Box>
+      {showStats && (
+        <StatsDialog
+          isOpen={showStats}
+          onClose={closeDialog}
+          pokemons={pokemons}
+          votes={votes}
+        />
+      )}
     </VStack>
   );
 };
