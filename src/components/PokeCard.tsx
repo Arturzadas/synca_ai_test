@@ -10,12 +10,14 @@ import {
 } from "@chakra-ui/react";
 import type { Pokemon } from "../types/pokemon";
 import { cardStyles as styles } from "./styles";
+import { typeColors } from "./styles";
 
 interface PokeCardProps {
   data: Pokemon;
   onVote: (pokemon: string) => void;
-  votes: number; // number of votes for this Pokémon
-  hasVoted: boolean; // to optionally disable the button after voting
+  votes: number;
+  hasVoted: boolean;
+  isWinner: boolean;
 }
 
 export const PokeCard: React.FC<PokeCardProps> = ({
@@ -23,58 +25,52 @@ export const PokeCard: React.FC<PokeCardProps> = ({
   onVote,
   votes,
   hasVoted,
+  isWinner,
 }) => {
+  const mainType = data.types[0]?.toLowerCase() || "normal";
+  const color = typeColors[mainType] || "#A8A77A";
+
   return (
-    <Box {...styles.card}>
-      {/* Sprite & Name */}
+    <Box {...styles.card} {...(isWinner && styles.isWinner)}>
+      {/* Top Section */}
+      <Box {...styles.topSection(data.types)}>
+        <Box {...styles.hpPill}>EXP {data.base_experience}</Box>
+      </Box>
+
+      {/* Sprite */}
       <VStack {...styles.spriteWrapper}>
         <Image src={data.sprite} alt={data.name} {...styles.sprite} />
         <Heading {...styles.name}>{data.name}</Heading>
       </VStack>
 
-      {/* Basic Info */}
-      <VStack {...styles.infoWrapper}>
-        <Text>
-          <strong>ID:</strong> {data.id}
-        </Text>
-        <Text>
-          <strong>Height:</strong> {data.height}
-        </Text>
-        <Text>
-          <strong>Weight:</strong> {data.weight}
-        </Text>
-        <Text>
-          <strong>Base Experience:</strong> {data.base_experience}
-        </Text>
-      </VStack>
-
       {/* Types */}
-      <Box mt={4}>
-        <Text {...styles.sectionTitle}>Types:</Text>
-        <HStack {...styles.badgeHStack}>
-          {data.types.map((type) => (
-            <Badge key={type} {...styles.typeBadge}>
-              {type}
-            </Badge>
-          ))}
-        </HStack>
-      </Box>
+      <HStack {...styles.typeHStack}>
+        {data.types.map((type) => (
+          <Badge key={type} {...styles.typeBadge(typeColors[type] || "#333")}>
+            {type}
+          </Badge>
+        ))}
+      </HStack>
 
-      {/* Abilities */}
-      <Box mt={4}>
-        <Text {...styles.sectionTitle}>Abilities:</Text>
-        <HStack {...styles.badgeHStack}>
-          {data.abilities.map((ability) => (
-            <Badge key={ability} {...styles.abilityBadge}>
-              {ability}
-            </Badge>
-          ))}
-        </HStack>
-      </Box>
+      {/* Stats */}
+      <HStack {...styles.statsHStack}>
+        <VStack gap={0}>
+          <Text {...styles.statValue}>{data.weight}</Text>
+          <Text {...styles.statLabel}>Weight</Text>
+        </VStack>
+        <VStack gap={0}>
+          <Text {...styles.statValue}>{data.height}</Text>
+          <Text {...styles.statLabel}>Height</Text>
+        </VStack>
+        <VStack gap={0}>
+          <Text {...styles.statValue}>{data.base_experience}</Text>
+          <Text {...styles.statLabel}>EXP</Text>
+        </VStack>
+      </HStack>
 
-      {/* Vote Button */}
+      {/* Vote button */}
       <Button
-        {...styles.voteButton}
+        {...styles.voteButton(data.types)}
         onClick={() => onVote(data.name)}
         disabled={hasVoted}
       >
