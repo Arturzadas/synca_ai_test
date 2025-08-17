@@ -20,7 +20,6 @@ import { FaClipboardCheck, FaRegClipboard } from "react-icons/fa";
 
 export const PokeDash = () => {
   //! top level state
-
   const [pokemons, setPokemons] = useState<Pokemon[]>([]);
   const [votes, setVotes] = useState<Votes>({});
   const [hasVoted, setHasVoted] = useState(false);
@@ -28,6 +27,7 @@ export const PokeDash = () => {
   const [peerId, setPeerId] = useState("");
   const [remoteId, setRemoteId] = useState("");
   const [connectionStatus, setConnectionStatus] = useState("Not connected");
+  const [connectedPeers, setConnectedPeers] = useState<string[]>([]); // new
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
@@ -39,20 +39,18 @@ export const PokeDash = () => {
   const [resultsReady, setResultsReady] = useState(false);
 
   const [copied, setCopied] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const peerRef = useRef<Peer | null>(null);
-  //? useage of 'any' as PeerJS doesn't have available types
   const connsRef = useRef<any>({});
   const hostConnRef = useRef<any>(null);
 
   const pokemonsRef = useRef<Pokemon[]>([]);
   const votesRef = useRef<Votes>({});
   const chatRef = useRef<ChatMessage[]>([]);
-
   const votersRef = useRef<Set<string>>(new Set());
 
   //! ref refresh for data accuracy
-
   useEffect(() => {
     pokemonsRef.current = pokemons;
   }, [pokemons]);
@@ -64,16 +62,35 @@ export const PokeDash = () => {
   }, [chatMessages]);
 
   //! init useEffect
-
   useEffect(() => {
     const loadPokemons = async () => {
+      setIsLoading(true);
       const bulba = await fetchPokemon("Bulbasaur");
       const pika = await fetchPokemon("Pikachu");
       setPokemons([bulba, pika]);
       setVotes({ [bulba.name]: 0, [pika.name]: 0 });
+      setIsLoading(false);
     };
     loadPokemons();
   }, []);
+
+  //!  detect leaving users
+  useEffect(() => {
+    const handleUnload = () => {
+      if (isHost) {
+        // Notify all peers that this host is leaving
+        broadcast({ type: "host_leaving" });
+      } else {
+        hostConnRef.current?.send({ type: "peer_leaving" });
+      }
+    };
+
+    window.addEventListener("beforeunload", handleUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleUnload);
+    };
+  }, [isHost]);
 
   useEffect(() => {
     const peer = new Peer();
@@ -87,10 +104,15 @@ export const PokeDash = () => {
     peer.on("connection", (conn) => {
       if (isHost) {
         connsRef.current[conn.peer] = conn;
-        setConnectionStatus(`Peer ${conn.peer} connected`);
+        setConnectedPeers(Object.keys(connsRef.current)); // update state
 
         conn.on("data", (msg) => handleIncomingData(msg, conn.peer));
-        conn.on("close", () => delete connsRef.current[conn.peer]);
+
+        conn.on("close", () => {
+          console.log("closed");
+          delete connsRef.current[conn.peer];
+          setConnectedPeers(Object.keys(connsRef.current)); // update state on disconnect
+        });
 
         conn.on("open", () => sendFullStateTo(conn));
       }
@@ -102,7 +124,6 @@ export const PokeDash = () => {
   }, [isHost]);
 
   //! helper functions
-
   const sendFullStateTo = (conn: any) => {
     conn.send({
       type: "initial_state",
@@ -128,6 +149,7 @@ export const PokeDash = () => {
   };
 
   const regenPokemon = async () => {
+    setIsLoading(true);
     const randomId1 = Math.floor(Math.random() * 1010) + 1;
     const randomId2 = Math.floor(Math.random() * 1010) + 1;
 
@@ -151,6 +173,7 @@ export const PokeDash = () => {
       ...prev,
       { from: "System", message: "Resetting Pokémon…" },
     ]);
+    setIsLoading(false);
   };
 
   const vote = (pokemon: string) => {
@@ -191,7 +214,6 @@ export const PokeDash = () => {
   };
 
   //! Peer / Host communication and data sharing
-
   const handleIncomingData = (message: any, fromPeer?: string) => {
     switch (message.type) {
       case "vote":
@@ -203,6 +225,7 @@ export const PokeDash = () => {
         break;
 
       case "regen":
+        setIsLoading(true);
         setPokemons(message.pokemons);
         setVotes({
           [message.pokemons[0].name]: 0,
@@ -214,9 +237,9 @@ export const PokeDash = () => {
           ...prev,
           { from: "System", message: "Resetting Pokémon…" },
         ]);
-
         votersRef.current.clear();
         setResultsReady(false);
+        setTimeout(() => setIsLoading(false), Math.random() * 1000);
         break;
 
       case "chat":
@@ -233,15 +256,27 @@ export const PokeDash = () => {
         break;
 
       case "initial_state":
+        setIsLoading(true);
         setPokemons(message.pokemons);
         setVotes(message.votes);
         setChatMessages(message.chatMessages);
         setHasVoted(false);
+        setIsLoading(false);
         break;
 
       case "voting_closed":
         setResultsReady(true);
         setShowStats(true);
+        break;
+
+      case "peer_leaving":
+        // Remove the peer that left from connsRef and connectedPeers
+        delete connsRef.current[fromPeer!];
+        setConnectedPeers(Object.keys(connsRef.current));
+        break;
+
+      case "host_leaving":
+        setConnectionStatus("Host has left");
         break;
 
       default:
@@ -262,9 +297,7 @@ export const PokeDash = () => {
     return winners.length === 1 ? winners[0] : "Tie";
   };
 
-  const closeDialog = () => {
-    setShowStats(false);
-  };
+  const closeDialog = () => setShowStats(false);
 
   const handleCopy = async () => {
     try {
@@ -304,6 +337,7 @@ export const PokeDash = () => {
                 votes={votes[p.name] || 0}
                 hasVoted={hasVoted}
                 isWinner={getWinner() === p.name}
+                isLoading={isLoading}
               />
             ))}
 
@@ -335,7 +369,23 @@ export const PokeDash = () => {
       )}
 
       <Box {...styles.connectionBox}>
-        <Text mb={2}>Connection Status: {connectionStatus}</Text>
+        <VStack align="start" gap={1} mb={2}>
+          <Text>Connection Status:</Text>
+          {isHost ? (
+            connectedPeers.length > 0 ? (
+              connectedPeers.map((peer) => (
+                <HStack key={peer} gap={2}>
+                  <Box w={3} h={3} borderRadius="full" bg="green.400" />
+                  <Text>{peer}</Text>
+                </HStack>
+              ))
+            ) : (
+              <Text>No peers connected</Text>
+            )
+          ) : (
+            <Text>{connectionStatus}</Text>
+          )}
+        </VStack>
 
         <VStack {...styles.hstackGap}>
           {isHost && (

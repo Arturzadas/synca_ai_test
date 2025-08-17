@@ -60,15 +60,30 @@ export const cardStyles = {
   `,
     transition: "box-shadow 0.3s ease-in-out",
   },
-  card: {
-    borderRadius: "xl",
-    boxShadow: "xl",
-    w: "300px",
-    overflow: "hidden",
-    textAlign: "center" as const,
-    position: "relative" as const,
-    bg: "white",
-    color: "black",
+  card: (types: string[]) => {
+    // Map types to colors, fallback if type is unknown
+    const colors = types.map(
+      (type) => typeColors[type.toLowerCase()] || "#A8A77A"
+    );
+
+    // Build a gradient that fades into white at the bottom
+    const gradient =
+      colors.length === 0
+        ? "white"
+        : colors.length === 1
+        ? `linear-gradient(to bottom, ${colors[0]} 0%, white 100%)`
+        : `linear-gradient(to bottom, ${colors.join(", ")} 0%, white 100%)`;
+
+    return {
+      borderRadius: "xl",
+      boxShadow: "xl",
+      w: "300px",
+      overflow: "hidden",
+      textAlign: "center" as const,
+      position: "relative" as const,
+      bg: gradient,
+      color: "black",
+    };
   },
   topSection: (types: string[]) => {
     const colors = types.map(

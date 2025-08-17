@@ -69,6 +69,7 @@ export const StatsDialog = ({
                     hasVoted={true}
                     onVote={() => {}}
                     isWinner={true}
+                    isLoading={false}
                   />
                 </Box>
               )}
