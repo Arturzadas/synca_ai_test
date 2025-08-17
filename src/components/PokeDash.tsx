@@ -18,6 +18,7 @@ import { fetchPokemon } from "./helpers/helper";
 import "../App.css";
 import { Dialog } from "@chakra-ui/react";
 import { StatsDialog } from "./StatsDialog";
+import { FaClipboard, FaClipboardCheck, FaRegClipboard } from "react-icons/fa";
 
 export const PokeDash = () => {
   const [pokemons, setPokemons] = useState<Pokemon[]>([]);
@@ -34,8 +35,10 @@ export const PokeDash = () => {
   const [isHost, setIsHost] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
 
-  const [showStats, setShowStats] = useState(false);
-  const [voters, setVoters] = useState<Set<string>>(new Set());
+  const [showStats, setShowStats] = useState(false); // controls dialog visibility
+  const [resultsReady, setResultsReady] = useState(false);
+
+  const [copied, setCopied] = useState(false);
 
   const peerRef = useRef<Peer | null>(null);
   //@ts-ignore
@@ -132,12 +135,14 @@ export const PokeDash = () => {
     setVotes({ [newPokemon1.name]: 0, [newPokemon2.name]: 0 });
     setHasVoted(false);
     setShowStats(false);
-    setVoters(new Set());
 
     broadcast({
       type: "regen",
       pokemons: [newPokemon1, newPokemon2],
     });
+
+    votersRef.current.clear();
+    setResultsReady(false);
 
     setChatMessages((prev) => [
       ...prev,
@@ -171,22 +176,16 @@ export const PokeDash = () => {
       votersRef.current.add(voterId);
 
       const totalPeers = Object.keys(connsRef.current).length + 1; // host + clients
-      console.log(
-        "Voters:",
-        votersRef.current.size,
-        "Total peers:",
-        totalPeers
-      );
 
       // 3️⃣ If everyone voted, show stats and notify clients
       if (votersRef.current.size >= totalPeers) {
-        setShowStats(true);
+        setResultsReady(true); // results are available
+        setShowStats(true); // open the modal
         console.log("dialog opening");
         broadcast({ type: "voting_closed" });
       }
 
       // 4️⃣ Update voters state to trigger re-render
-      setVoters(new Set(votersRef.current));
 
       // 5️⃣ Broadcast updated votes to all peers
       Object.values(connsRef.current).forEach((conn) => {
@@ -229,11 +228,13 @@ export const PokeDash = () => {
         });
         setHasVoted(false);
         setShowStats(false);
-        setVoters(new Set());
         setChatMessages((prev) => [
           ...prev,
           { from: "System", message: "Resetting Pokémon…" },
         ]);
+
+        votersRef.current.clear();
+        setResultsReady(false);
         break;
 
       case "chat":
@@ -258,6 +259,7 @@ export const PokeDash = () => {
 
       case "voting_closed":
         console.log("voting closed");
+        setResultsReady(true);
         setShowStats(true);
         break;
 
@@ -285,13 +287,22 @@ export const PokeDash = () => {
     return Math.round((votes[name] / total) * 100);
   };
 
-  const winnerName = getWinner();
-  const winnerPokemon = pokemons.find((p) => p.name === winnerName);
-
   const closeDialog = () => {
     console.log("closing");
     setShowStats(false);
   };
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(peerId);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 3500);
+    } catch (err) {
+      console.error("Failed to copy!", err);
+    }
+  };
+
+  //TODO when new battle, refresh state for dialog opening sequence
 
   return (
     <VStack {...styles.container} className={"font"}>
@@ -319,12 +330,21 @@ export const PokeDash = () => {
           </HStack>
 
           <Heading size="md">Winner: {getWinner()}</Heading>
-
-          {isHost && (
-            <Button {...globalStyles.button} onClick={regenPokemon}>
-              New Battle
-            </Button>
-          )}
+          <HStack>
+            {isHost && (
+              <Button {...globalStyles.button} onClick={regenPokemon}>
+                New Battle
+              </Button>
+            )}
+            {resultsReady && (
+              <Button
+                {...globalStyles.button}
+                onClick={() => setShowStats(true)}
+              >
+                Show Results
+              </Button>
+            )}
+          </HStack>
         </>
       )}
 
@@ -332,24 +352,41 @@ export const PokeDash = () => {
         <Text mb={2}>Connection Status: {connectionStatus}</Text>
 
         <VStack {...styles.hstackGap}>
-          <Box {...styles.inputBox}>
-            <Text>Your Peer ID:</Text>
-            <Input {...globalStyles.input} value={peerId} readOnly />
-          </Box>
+          {isHost && (
+            <Box {...styles.inputBox}>
+              <Text>Your Host ID:</Text>
+              <HStack>
+                <Input {...globalStyles.input} value={peerId} readOnly />
+                <Button
+                  w={"100px"}
+                  {...globalStyles.button}
+                  onClick={handleCopy}
+                >
+                  {copied ? <FaClipboardCheck /> : <FaRegClipboard />}
+                </Button>
+              </HStack>
+            </Box>
+          )}
 
-          <Box>
-            <Text>Connect to Host ID:</Text>
-            <HStack>
-              <Input
-                value={remoteId}
-                onChange={(e) => setRemoteId(e.target.value)}
-                {...globalStyles.input}
-              />
-              <Button onClick={connectToPeer} {...globalStyles.button}>
-                Connect
-              </Button>
-            </HStack>
-          </Box>
+          {!isHost && (
+            <Box>
+              <Text>Connect to Host ID:</Text>
+              <HStack>
+                <Input
+                  value={remoteId}
+                  onChange={(e) => setRemoteId(e.target.value)}
+                  {...globalStyles.input}
+                />
+                <Button
+                  onClick={connectToPeer}
+                  w={"100px"}
+                  {...globalStyles.button}
+                >
+                  Connect
+                </Button>
+              </HStack>
+            </Box>
+          )}
 
           {!isHost && (
             <Button {...globalStyles.button} onClick={() => setIsHost(true)}>

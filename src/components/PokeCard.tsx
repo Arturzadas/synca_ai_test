@@ -11,6 +11,9 @@ import {
 import type { Pokemon } from "../types/pokemon";
 import { cardStyles as styles } from "./styles";
 import { typeColors } from "./styles";
+import { FaWeightHanging } from "react-icons/fa";
+import { CiLineHeight } from "react-icons/ci";
+import { GiBodyHeight } from "react-icons/gi";
 
 interface PokeCardProps {
   data: Pokemon;
@@ -34,7 +37,7 @@ export const PokeCard: React.FC<PokeCardProps> = ({
     <Box {...styles.card} {...(isWinner && styles.isWinner)}>
       {/* Top Section */}
       <Box {...styles.topSection(data.types)}>
-        <Box {...styles.hpPill}>EXP {data.base_experience}</Box>
+        <Box {...styles.hpPill}>XP {data.base_experience}</Box>
       </Box>
 
       {/* Sprite */}
@@ -55,16 +58,22 @@ export const PokeCard: React.FC<PokeCardProps> = ({
       {/* Stats */}
       <HStack {...styles.statsHStack}>
         <VStack gap={0}>
+          <Text {...styles.statLabel}>
+            <FaWeightHanging />
+          </Text>
           <Text {...styles.statValue}>{data.weight}</Text>
-          <Text {...styles.statLabel}>Weight</Text>
         </VStack>
         <VStack gap={0}>
+          <Text {...styles.statLabel}>
+            <GiBodyHeight />
+          </Text>
           <Text {...styles.statValue}>{data.height}</Text>
-          <Text {...styles.statLabel}>Height</Text>
         </VStack>
         <VStack gap={0}>
+          <Text {...styles.statLabel} fontWeight={"bold"}>
+            XP
+          </Text>
           <Text {...styles.statValue}>{data.base_experience}</Text>
-          <Text {...styles.statLabel}>EXP</Text>
         </VStack>
       </HStack>
 
@@ -74,7 +83,8 @@ export const PokeCard: React.FC<PokeCardProps> = ({
         onClick={() => onVote(data.name)}
         disabled={hasVoted}
       >
-        Vote ({votes})
+        Vote
+        <Badge>{votes}</Badge>
       </Button>
     </Box>
   );

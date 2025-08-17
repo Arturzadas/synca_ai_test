@@ -196,3 +196,61 @@ export const globalStyles = {
     color: "white",
   },
 };
+
+export const resultsStyles = {
+  dialogContent: {
+    p: 6,
+    borderRadius: "2xl",
+    minW: "sm",
+    maxW: "lg",
+    shadow: "lg",
+  },
+  header: {
+    w: "100%",
+    justify: "space-between",
+    align: "center",
+  },
+  heading: {
+    size: "md" as const,
+    p: 0,
+    textAlign: "center",
+    flex: 1,
+  },
+  closeButton: {
+    position: "absolute",
+    top: 2,
+    right: 2,
+  },
+  winnerBox: {
+    mb: 6,
+    display: "flex",
+    flexDir: "column",
+    alignItems: "center",
+  },
+  winnerText: {
+    fontWeight: "bold",
+    mb: 2,
+  },
+  resultBox: {
+    w: "100%",
+  },
+  resultText: {
+    fontWeight: "semibold",
+    mb: 1,
+  },
+  progressBarBg: {
+    bg: "gray.200",
+    h: "24px",
+    borderRadius: "md",
+    overflow: "hidden",
+  },
+  progressBarFill: (pct: number) => ({
+    bg: "blue.400",
+    h: "100%",
+    w: `${pct}%`,
+  }),
+  footer: {
+    mt: 6,
+    justifyContent: "center",
+  },
+};
