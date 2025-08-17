@@ -89,10 +89,6 @@ export const StatsDialog = ({
                 })}
               </VStack>
             </Dialog.Body>
-
-            <Dialog.Footer {...styles.footer}>
-              <Button onClick={onClose}>Close</Button>
-            </Dialog.Footer>
           </Dialog.Content>
         </Dialog.Positioner>
       </Portal>

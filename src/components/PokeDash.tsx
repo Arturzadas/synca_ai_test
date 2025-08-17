@@ -8,7 +8,6 @@ import {
   Text,
   Input,
   Button,
-  CloseButton,
 } from "@chakra-ui/react";
 import type { ChatMessage, Pokemon, Votes } from "../types/pokemon";
 import { PokeCard } from "./PokeCard";
@@ -16,11 +15,12 @@ import { globalStyles, dashStyles as styles } from "./styles";
 import { Chat } from "./Chat";
 import { fetchPokemon } from "./helpers/helper";
 import "../App.css";
-import { Dialog } from "@chakra-ui/react";
 import { StatsDialog } from "./StatsDialog";
-import { FaClipboard, FaClipboardCheck, FaRegClipboard } from "react-icons/fa";
+import { FaClipboardCheck, FaRegClipboard } from "react-icons/fa";
 
 export const PokeDash = () => {
+  //! top level state
+
   const [pokemons, setPokemons] = useState<Pokemon[]>([]);
   const [votes, setVotes] = useState<Votes>({});
   const [hasVoted, setHasVoted] = useState(false);
@@ -35,22 +35,24 @@ export const PokeDash = () => {
   const [isHost, setIsHost] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
 
-  const [showStats, setShowStats] = useState(false); // controls dialog visibility
+  const [showStats, setShowStats] = useState(false);
   const [resultsReady, setResultsReady] = useState(false);
 
   const [copied, setCopied] = useState(false);
 
   const peerRef = useRef<Peer | null>(null);
-  //@ts-ignore
-  const connsRef = useRef<Record<string, Peer.DataConnection>>({});
-  //@ts-ignore
-  const hostConnRef = useRef<Peer.DataConnection | null>(null);
+  //? useage of 'any' as PeerJS doesn't have available types
+  const connsRef = useRef<any>({});
+  const hostConnRef = useRef<any>(null);
 
   const pokemonsRef = useRef<Pokemon[]>([]);
   const votesRef = useRef<Votes>({});
   const chatRef = useRef<ChatMessage[]>([]);
 
-  // Keep refs updated
+  const votersRef = useRef<Set<string>>(new Set());
+
+  //! ref refresh for data accuracy
+
   useEffect(() => {
     pokemonsRef.current = pokemons;
   }, [pokemons]);
@@ -61,7 +63,8 @@ export const PokeDash = () => {
     chatRef.current = chatMessages;
   }, [chatMessages]);
 
-  // Load initial Pokémon
+  //! init useEffect
+
   useEffect(() => {
     const loadPokemons = async () => {
       const bulba = await fetchPokemon("Bulbasaur");
@@ -72,7 +75,6 @@ export const PokeDash = () => {
     loadPokemons();
   }, []);
 
-  // Initialize Peer
   useEffect(() => {
     const peer = new Peer();
     peerRef.current = peer;
@@ -99,8 +101,9 @@ export const PokeDash = () => {
     };
   }, [isHost]);
 
-  //@ts-ignore
-  const sendFullStateTo = (conn: Peer.DataConnection) => {
+  //! helper functions
+
+  const sendFullStateTo = (conn: any) => {
     conn.send({
       type: "initial_state",
       pokemons: pokemonsRef.current,
@@ -161,34 +164,25 @@ export const PokeDash = () => {
     }
   };
 
-  const votersRef = useRef<Set<string>>(new Set());
-
   const updateVotes = (pokemon: string, voterId: string) => {
-    // 1️⃣ Update votes state
     setVotes((prevVotes) => {
       const updatedVotes = {
         ...prevVotes,
         [pokemon]: (prevVotes[pokemon] || 0) + 1,
       };
-      votesRef.current = updatedVotes; // keep ref in sync
+      votesRef.current = updatedVotes;
 
-      // 2️⃣ Update voters ref
       votersRef.current.add(voterId);
 
-      const totalPeers = Object.keys(connsRef.current).length + 1; // host + clients
+      const totalPeers = Object.keys(connsRef.current).length + 1;
 
-      // 3️⃣ If everyone voted, show stats and notify clients
       if (votersRef.current.size >= totalPeers) {
-        setResultsReady(true); // results are available
-        setShowStats(true); // open the modal
-        console.log("dialog opening");
+        setResultsReady(true);
+        setShowStats(true);
         broadcast({ type: "voting_closed" });
       }
 
-      // 4️⃣ Update voters state to trigger re-render
-
-      // 5️⃣ Broadcast updated votes to all peers
-      Object.values(connsRef.current).forEach((conn) => {
+      Object.values(connsRef.current).forEach((conn: any) => {
         if (conn.open) conn.send({ type: "votes_update", votes: updatedVotes });
       });
 
@@ -196,19 +190,7 @@ export const PokeDash = () => {
     });
   };
 
-  const sendMessage = () => {
-    if (!chatInput.trim()) return;
-    const msg = chatInput.trim();
-
-    if (isHost) {
-      broadcast({ type: "chat", text: msg });
-    } else {
-      hostConnRef.current?.send({ type: "chat", text: msg });
-    }
-
-    setChatMessages((prev) => [...prev, { from: "You", message: msg }]);
-    setChatInput("");
-  };
+  //! Peer / Host communication and data sharing
 
   const handleIncomingData = (message: any, fromPeer?: string) => {
     switch (message.type) {
@@ -243,7 +225,7 @@ export const PokeDash = () => {
           { from: isHost ? "Peer" : "Host", message: message.text },
         ]);
         if (isHost && fromPeer) {
-          Object.values(connsRef.current).forEach((conn) => {
+          Object.values(connsRef.current).forEach((conn: any) => {
             if (conn.open && conn.peer !== fromPeer)
               conn.send({ type: "chat", text: message.text });
           });
@@ -258,7 +240,6 @@ export const PokeDash = () => {
         break;
 
       case "voting_closed":
-        console.log("voting closed");
         setResultsReady(true);
         setShowStats(true);
         break;
@@ -269,7 +250,7 @@ export const PokeDash = () => {
   };
 
   const broadcast = (msg: any) => {
-    Object.values(connsRef.current).forEach((conn) => {
+    Object.values(connsRef.current).forEach((conn: any) => {
       if (conn.open) conn.send(msg);
     });
   };
@@ -281,14 +262,7 @@ export const PokeDash = () => {
     return winners.length === 1 ? winners[0] : "Tie";
   };
 
-  const getPercentage = (name: string) => {
-    const total = Object.values(votes).reduce((a, b) => a + b, 0);
-    if (total === 0) return 0;
-    return Math.round((votes[name] / total) * 100);
-  };
-
   const closeDialog = () => {
-    console.log("closing");
     setShowStats(false);
   };
 
@@ -302,7 +276,19 @@ export const PokeDash = () => {
     }
   };
 
-  //TODO when new battle, refresh state for dialog opening sequence
+  const sendMessage = () => {
+    if (!chatInput.trim()) return;
+    const msg = chatInput.trim();
+
+    if (isHost) {
+      broadcast({ type: "chat", text: msg });
+    } else {
+      hostConnRef.current?.send({ type: "chat", text: msg });
+    }
+
+    setChatMessages((prev) => [...prev, { from: "You", message: msg }]);
+    setChatInput("");
+  };
 
   return (
     <VStack {...styles.container} className={"font"}>

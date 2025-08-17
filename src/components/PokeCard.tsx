@@ -12,7 +12,6 @@ import type { Pokemon } from "../types/pokemon";
 import { cardStyles as styles } from "./styles";
 import { typeColors } from "./styles";
 import { FaWeightHanging } from "react-icons/fa";
-import { CiLineHeight } from "react-icons/ci";
 import { GiBodyHeight } from "react-icons/gi";
 
 interface PokeCardProps {
@@ -30,9 +29,6 @@ export const PokeCard: React.FC<PokeCardProps> = ({
   hasVoted,
   isWinner,
 }) => {
-  const mainType = data.types[0]?.toLowerCase() || "normal";
-  const color = typeColors[mainType] || "#A8A77A";
-
   return (
     <Box {...styles.card} {...(isWinner && styles.isWinner)}>
       {/* Top Section */}
@@ -77,7 +73,6 @@ export const PokeCard: React.FC<PokeCardProps> = ({
         </VStack>
       </HStack>
 
-      {/* Vote button */}
       <Button
         {...styles.voteButton(data.types)}
         onClick={() => onVote(data.name)}

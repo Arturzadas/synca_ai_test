@@ -58,7 +58,7 @@ export const cardStyles = {
     0 0 20px 5px rgba(255, 215, 0, 0.6), /* larger, soft glow */
     inset 0 0 10px rgba(255, 223, 0, 0.8) /* inner highlight */
   `,
-    transition: "box-shadow 0.3s ease-in-out", // smooth glow transition
+    transition: "box-shadow 0.3s ease-in-out",
   },
   card: {
     borderRadius: "xl",
@@ -204,6 +204,8 @@ export const resultsStyles = {
     minW: "sm",
     maxW: "lg",
     shadow: "lg",
+    bg: "#121212d2",
+    backdropFilter: "blur(5px)",
   },
   header: {
     w: "100%",
